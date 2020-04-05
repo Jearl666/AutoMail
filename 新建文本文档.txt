@@ -1,0 +1,281 @@
+//////////////////////////////////////////////////////////Click 事件内测试代码//////////////////////////////////////////////////////////////
+Call_VBA call_vba = new Call_VBA();
+                try
+                {
+                // 返回对象
+                string xadd = @"C:\Users\syy\Desktop\C#-Packages\test\test.xlsm";
+                object objRtn = new object();
+
+                //执行指定Excel中的宏，执行时显示Excel
+                call_vba.RunExcelMacro(xadd,"test",new object[] { },out objRtn, true);
+
+                    // 执行指定Excel中的宏，执行时不显示Excel
+                    //RunExcelMacro(xadd,"getTime2",new Object[] { "现在时刻" },out objRtn,false);
+
+
+                }
+                catch (System.Exception ex)
+                {
+                    MessageBox.Show(ex.Message);
+                }
+
+////////////////////////////////////////////////////////////////////////////////Auto mail Class 测试代码////////////////////////////////////////////////////////
+
+using System;
+using System.IO;
+using Excel = Microsoft.Office.Interop.Excel;
+
+class Call_VBA
+{
+   
+///记录excel地址文件
+/// <summary>
+/// 执行Excel中的宏
+/// /// </summary>
+/// <param name="excelFilePath">Excel文件路径</param>
+/// <param name="macroName">宏名称</param>
+/// <param name="parameters">宏参数组</param>
+/// <param name="rtnValue">宏返回值</param>
+/// <param name="isShowExcel">执行时是否显示Excel</param>
+    public void RunExcelMacro(string excelFilePath, string macroName, object[] parameters, out object rtnValue, bool isShowExcel)
+    {
+        try
+        {
+            #region 检查入参
+            // 检查文件是否存在
+            if (!File.Exists(excelFilePath))
+            {
+                throw new System.Exception(excelFilePath + " 文件不存在");
+            }
+
+            // 检查是否输入宏名称
+            if (string.IsNullOrEmpty(macroName))
+            {
+                throw new System.Exception("请输入宏的名称");
+            }
+            #endregion
+
+
+            #region 调用宏处理
+
+            // 准备打开Excel文件时的缺省参数对象
+            object oMissing = System.Reflection.Missing.Value;
+
+            // 根据参数组是否为空，准备参数组对象
+            object[] paraObjects;
+
+            if (parameters == null)
+            {
+                paraObjects = new object[] { macroName };
+            }
+            else
+            {
+                // 宏参数组长度
+                int paraLength = parameters.Length;
+
+                paraObjects = new object[paraLength + 1];
+
+                paraObjects[0] = macroName;
+                for (int i = 0; i < paraLength; i++)
+                {
+                    paraObjects[i + 1] = parameters[i];
+                }
+            }
+            
+
+            // 创建Excel对象示例
+            Excel.ApplicationClass oExcel = new Excel.ApplicationClass();
+
+            // 判断是否要求执行时Excel可见
+            if (isShowExcel)
+            {
+                // 使创建的对象可见
+                oExcel.Visible = true;
+            }
+            else
+            {
+                oExcel.Visible = false;
+            }
+
+            // 创建Workbooks对象
+            Excel.Workbooks oBooks = oExcel.Workbooks;
+
+            // 创建Workbook对象
+            Excel._Workbook oBook = null;
+
+            // 打开指定的Excel文件
+
+            oBook = oBooks.Open(
+                                    excelFilePath,
+                                    oMissing,
+                                    oMissing,
+                                    oMissing,
+                                    oMissing,
+                                    oMissing,
+                                    oMissing,
+                                    oMissing,
+                                    oMissing,
+                                    oMissing,
+                                    oMissing,
+                                    oMissing,
+                                    oMissing,
+                                    oMissing,
+                                    oMissing
+);
+
+            // 执行Excel中的宏
+            rtnValue = this.RunMacro(oExcel, paraObjects);
+
+            // 保存更改
+            oBook.Save();
+
+            // 退出Workbook
+            oBook.Close(false, oMissing, oMissing);
+
+
+            #endregion
+
+
+            #region 释放对象
+
+            // 释放Workbook对象
+            System.Runtime.InteropServices.Marshal.ReleaseComObject(oBook);
+            oBook = null;
+
+            // 释放Workbooks对象
+            System.Runtime.InteropServices.Marshal.ReleaseComObject(oBooks);
+            oBooks = null;
+
+            // 关闭Excel
+            oExcel.Quit();
+
+            // 释放Excel对象
+            System.Runtime.InteropServices.Marshal.ReleaseComObject(oExcel);
+            oExcel = null;
+
+            // 调用垃圾回收
+            GC.Collect();
+
+
+            #endregion
+        }
+        catch (Exception ex)
+        {
+            throw ex;
+        }
+
+    }
+
+    /// <summary>
+    /// 执行宏
+    /// </summary>
+    /// <param name="oApp">Excel对象</param>
+    /// <param name="oRunArgs">参数（第一个参数为指定宏名称，后面为指定宏的参数值）</param>
+    /// <returns>宏返回值</returns>
+    private object RunMacro(object oApp, object[] oRunArgs)
+    {
+        try
+        {
+            // 声明一个返回对象
+            object objRtn;
+
+            // 反射方式执行宏
+            objRtn = oApp.GetType().InvokeMember(
+                                                    "Run",
+                                                    System.Reflection.BindingFlags.Default |
+                                                    System.Reflection.BindingFlags.InvokeMethod,
+                                                    null,
+                                                    oApp,
+                                                    oRunArgs
+                                                 );
+
+            // 返回值
+            return objRtn;
+
+        }
+        catch (Exception ex)
+        {
+            if (ex.InnerException.Message.ToString().Length > 0)
+            {
+                throw ex.InnerException;
+            }
+            else
+            {
+                throw ex;
+            }
+        }
+    }
+
+}
+///////////////////////////////////////////////////////////////////////////定时器测试代码////////////////////////////////////////
+using FluentScheduler;
+using System.Windows.Forms;
+
+    public class scheduler:Registry
+    {
+        public scheduler()
+        {
+            Schedule<Automail>().ToRunEvery(1).Days().At(17, 4);
+        }
+
+        public class Automail : IJob
+        {
+            void IJob.Execute()
+           {
+
+            Call_VBA vba = new Call_VBA();
+            try
+               {
+                // 返回对象
+                string xadd = @"C:\Users\syy\Desktop\C#-Packages\test\test.xlsm";
+                object objRtn = new object();
+                //执行指定Excel中的宏，执行时显示Excel
+                vba.RunExcelMacro(xadd, "test", new object[] { }, out objRtn, true);
+                 }
+            catch (System.Exception ex)
+               {
+                MessageBox.Show(ex.Message);
+                }
+
+             }
+        }
+
+    }
+//////////////////////////////////////////定时器初始化测试代码/////////////////////////////////////////
+
+using System;
+using System.Windows.Forms;
+using FluentScheduler;
+
+namespace WindowsFormsApp1
+{
+    static class Program
+    {
+        /// <summary>
+        /// 应用程序的主入口点。
+        /// </summary>
+        [STAThread]
+        static void Main()
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            JobManager.Initialize(new scheduler());
+            Application.Run(new Form1());
+          
+
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////解压缩测试代码///////////////////////////////////
+try
+            {
+                string filepath = @"C:\Users\syy\Desktop\C#-Packages\test\test.zip";
+                string extract_filepath = @"C:\Users\syy\Desktop\C#-Packages\test\test";
+                ZipFile.ExtractToDirectory(filepath, extract_filepath);
+            }
+            catch(System.Exception err) 
+            {
+                MessageBox.Show(err.Message);
+                /////调用smtp接口
+            }
